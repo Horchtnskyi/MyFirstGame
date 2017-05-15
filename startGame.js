@@ -1,17 +1,15 @@
 game.newLoopFromConstructor('startGame', function(){
 game.setFPS(60);
 
+//Joistick
+//joystick.on('btnFire:press', function () {
+//    game.setLoop('startGame');
+//});
 
+var fixerTimer = {
+    playerAttack: true,
+}
 var score = 0;
-var scoreText = game.newTextObject({
-  text : score,
-  x : 10,
-  y : 10,
-  size : 20,
-  color : 'blue',
-  padding : 20,
-  fillColor : '#FFCFCF',
-});
 platformer.onCellCollision = function (player, cell) {
     if(cell.file == "Textures/Stars/starGold.png"){
         score += 10;
@@ -25,7 +23,6 @@ platformer.onCellCollision = function (player, cell) {
         
     }
 };
-    
     
 var randomBackgroundDecoration = 0;
 var sizeBackground=256,x,y, backGorund=[];
@@ -69,15 +66,19 @@ for(x = 0; x<20; x++){
 }
 
 //Player
-var playerStand = game.newAnimationObject( { 
+var playerStandAnimation = tiles.newImage("Textures/player/spangebob.gif").getAnimation(0, 5, 35.69, 45, 9),
+    playerMoveAnimation = tiles.newImage("Textures/player/spangebob.gif").getAnimation(0, 5, 35.69, 45, 9),
+    playerJumpAnimation = tiles.newImage("Textures/player/spangebob.gif").getAnimation(0, 280, 40.90, 50, 8),
+    playerAtackAnimation = tiles.newImage("Textures/player/spangebob.gif").getAnimation(218, 215, 48.33, 50, 1),
+playerStand = game.newAnimationObject( { 
       animation : tiles.newImage("Textures/player/spangebob.gif").getAnimation(0, 5, 35.69, 45, 9), 
       x : x, 
       y : y, 
       w : 41, 
       h : 45, 
       delay: 5,
-      visible : true 
-    }),
+      visible : true,
+}),
 playerMove = game.newAnimationObject( { 
       animation : tiles.newImage("Textures/player/spangebob.gif").getAnimation(0, 110, 40, 45, 10), 
       x : 0, 
@@ -113,24 +114,14 @@ var player = game.newRectObject({
     y : 1900,
     w : 40,
     h : 40,
+    userData : {
+        health : 100,
+        hasAttacked: false
+    }
 });
 
-    
-//var wolf = game.newRectObject({
-//    x : 1000,
-//    y : 1900,
-//    w : 40,
-//    h : 40,
-//    fillColor : 'red'
-//});
-    
-
-    
 player.speed = point(0, 0);
-var enemyMove = true;
 
-    
-    
 //Map    
 var map = {
     width : 128,
@@ -208,7 +199,7 @@ var enemisMap = {
     ]
 }
 
-var enemys = [];
+var enemies = [];
 
 OOP.forArr(starsMap.level, function (string, y){
     OOP.forArr(string, function (el, x){
@@ -217,7 +208,7 @@ OOP.forArr(starsMap.level, function (string, y){
         platformer.addCell(game.newImageObject({
                 file : "Textures/Stars/starGold.png",
                 x : x * map.width,
-                y : y * map.height - 70,
+                y : y * map.height - 35,
                 w : starsMap.size,
                 h : starsMap.size,
             }));
@@ -226,7 +217,7 @@ OOP.forArr(starsMap.level, function (string, y){
         platformer.addCell(game.newImageObject({
             file : "Textures/Stars/starBronze.png",
                 x : x * map.width,
-                y : y * map.height - 70,
+                y : y * map.height - 35,
                 w : starsMap.size,
                 h : starsMap.size,
             }));
@@ -235,34 +226,45 @@ OOP.forArr(starsMap.level, function (string, y){
         platformer.addCell(game.newImageObject({
             file : "Textures/Stars/starSilver.png",
                 x : x * map.width,
-                y : y * map.height - 70,
+                y : y * map.height - 35,
                 w : starsMap.size,
                 h : starsMap.size,
             }));
         }
     });
 });
-//Enemys
+//Enemies
+var eAnimationMove = tiles.newImage("Textures/Enemy/wolf.png").getAnimation(320, 96, 64, 30, 5),
+    eAanimationHit = tiles.newImage("Textures/Enemy/wolf.png").getAnimation(320, 0, 64, 30, 4),
+    lastEnemyHealth = 0;
 OOP.forArr(enemisMap.level, function (string, y){
     OOP.forArr(string, function (el, x){
         if(!el || el == ' ') return;
         if(el == 'w'){
-        enemys.push(game.newAnimationObject({
+        enemies.push(game.newAnimationObject({
               animation : tiles.newImage("Textures/Enemy/wolf.png").getAnimation(320, 96, 64, 30, 5),
               x : x * map.width,
               y : y * map.height - 20,
               w : 64, 
               h : 30, 
               delay: 10,
+              visible : true,
               userData: {
-                  enemyMove: true
+                  moveR: true,
+                  hitStop: false,
+                  hitJumpR: false,
+                  hitJumpl: false,
+                  hasAttacked: false,
+                  hasAttackedTimerJump: 0,
+                  hasAttackedTimerStop: 0,
+                  setTimers: false,
+                  hitPoint: 100,
+                  speedYfixer: false
               }
             }));
         };
     });
 });
-
-
     
 OOP.forArr(map.level, function (string, y){
     OOP.forArr(string, function (el, x){
@@ -344,17 +346,77 @@ OOP.forArr(map.level, function (string, y){
 
     });
 });
+
 platformer.setPlayer(player);
 platformer.addAction(player);
 player.maxSpeed = point(1, 6);
-for(var i = 0; i < enemys.length; i++) {
-    var randomMove = Math.floor(Math.random() * 2);
-    if(randomMove == 0) {
-        enemys[i].speed = 50;
-    } else {
-        enemys[i].speed = 50;
+//Joistick
+    
+joystick.on('btnLeft:down', function() {
+    if(player.speed.y < 0 || player.speed.y > 0 && player.speed.y == 0.2) {
+    player.speed.x -= 5;
+    player.setFlip(1, 0);
+    playerStand.setAnimation(playerMoveAnimation);
     }
-}
+});
+joystick.on('btnRight:down', function() {
+    if(player.speed.y < 0 || player.speed.y > 0 && player.speed.y == 0.2) {
+    player.speed.x += 5;
+    playerStand.setVisible(false);
+    playerJump.setVisible(false);
+    playerMove.setVisible(true);
+    playerStand.setFlip(0, 0);
+    playerJump.setFlip(0, 0);
+    playerMove.setFlip(0, 0);
+    playerAttack.setFlip(0, 0);
+    log('speed x ' + player.speed.x);
+    }
+});
+joystick.on('btnFire:down', function() {
+    log(player.speed.y + ' ' + player.speed.x)
+   if((player.speed.y == 0.2 || player.speed.y == 0) && player.speed.x == 0) {
+    playerStand.setVisible(false);
+    playerJump.setVisible(false);
+    playerMove.setVisible(false);
+    playerAttack.setVisible(true);
+    var timeAtack1 = OOP.newTimer(50, function() {
+        fixerTimer.playerAttack = false;
+    });
+    timeAtack1.start();
+    var timeAtack2 = OOP.newTimer(100, function() {
+        fixerTimer.playerAttack = true;
+    });
+    timeAtack2.start();
+        for(var i = 0; i < enemies.length; i++) {
+            if(playerStand.flip.x == 0 && (enemies[i].x <= player.x + 60 && enemies[i].x >= player.x 
+                && (Math.floor(enemies[i].y) >= player.y + 5 && Math.floor(enemies[i].y) <= player.y + 15))
+                && enemies[i].hasAttacked == false){
+                log(enemies[i].y + ' ' + player.y)
+                enemies[i].hasAttackedTimerJump = 0;
+                enemies[i].hasAttackedTimerStop = 0;
+                enemies[i].hasAttacked = true;
+                enemies[i].hitPoint -= 25;
+                lastEnemyHealth = enemies[i].hitPoint;
+                enemies[i].hitJumpR = true;
+                enemies[i].hitStop = true;
+                enemies[i].setAnimation(eAanimationHit);
+                enemies[i].setTimers = true;
+            } else if(playerStand.flip.x == 1 && (enemies[i].x >= player.x - 75 && enemies[i].x <= player.x 
+                && (Math.floor(enemies[i].y) >= player.y + 5 && Math.floor(enemies[i].y) <= player.y + 15))
+                && enemies[i].hasAttacked == false){
+                enemies[i].hasAttackedTimerJump = 0;
+                enemies[i].hasAttackedTimerStop = 0;
+                enemies[i].hasAttacked = true;
+                enemies[i].hitPoint -= 25;
+                lastEnemyHealth = enemies[i].hitPoint;
+                enemies[i].hitJumpL = true;
+                enemies[i].hitStop = true;
+                enemies[i].setAnimation(eAanimationHit);
+                enemies[i].setTimers = true;
+            }
+        }
+   }
+});
     
 this.update = function() {
 game.clear();
@@ -363,10 +425,14 @@ game.clear();
 //Controll
 if(key.isDown('D') || key.isDown('RIGHT')) {
     if(player.speed.y < 0 || player.speed.y > 0 && player.speed.y != 0.2) {
-            player.speed.x = 3;
-            playerStand.setVisible(false);
-            playerJump.setVisible(true);
-            playerMove.setVisible(false);
+    player.speed.x = 3;
+    playerStand.setFlip(0, 0);
+    playerJump.setFlip(0, 0);
+    playerMove.setFlip(0, 0);
+    playerAttack.setFlip(0, 0);
+    playerStand.setVisible(false);
+    playerJump.setVisible(true);
+    playerMove.setVisible(false);
         }else if (key.isDown("SHIFT")) {
             player.speed.x = 5;
             playerStand.setVisible(false);
@@ -384,7 +450,7 @@ if(key.isDown('D') || key.isDown('RIGHT')) {
     playerStand.setVisible(false);
     playerJump.setVisible(false);
     playerMove.setVisible(true);
-            }
+}
 } else if (key.isDown('A') || key.isDown('LEFT')) {
         if(player.speed.y < 0 || player.speed.y > 0 && player.speed.y != 0.2) {
             player.speed.x = -3;
@@ -411,7 +477,8 @@ if(key.isDown('D') || key.isDown('RIGHT')) {
     playerJump.setVisible(false);
     playerMove.setVisible(true);
             }
-} else if(player.speed.y == 0) {
+} 
+else if(player.speed.y == 0) {
     player.speed.x = 0;
     playerStand.setVisible(true);
     playerJump.setVisible(false);
@@ -419,18 +486,47 @@ if(key.isDown('D') || key.isDown('RIGHT')) {
     playerAttack.setVisible(false);
 };
     
-if(key.isDown('SPACE')) {
+if(key.isDown('SPACE') && fixerTimer.playerAttack != false) {
    if(!player.speed.y < 0 || !player.speed.y > 0 && player.speed.y != 0.2 && player.speed.x == 0) {
     playerStand.setVisible(false);
     playerJump.setVisible(false);
     playerMove.setVisible(false);
     playerAttack.setVisible(true);
-        for(var i = 0; i < enemys.length; i++) {
-            log(enemys[i].y +'enemy');
-            log(player.y);
-            if((enemys[i].x <= player.x + 60 || enemys[i].x <= player.x - 60) && (enemys[i].y == player.y + 10)) {
-                enemys.splice(i, 1);
-            } 
+    var timeAtack1 = OOP.newTimer(50, function() {
+        fixerTimer.playerAttack = false;
+    });
+    timeAtack1.start();
+    var timeAtack2 = OOP.newTimer(100, function() {
+        fixerTimer.playerAttack = true;
+    });
+    timeAtack2.start();
+        for(var i = 0; i < enemies.length; i++) {
+            if(playerStand.flip.x == 0 && (enemies[i].x <= player.x + 60 && enemies[i].x >= player.x 
+                && (Math.floor(enemies[i].y) >= player.y + 5 && Math.floor(enemies[i].y) <= player.y + 15))
+                && enemies[i].hasAttacked == false){
+                log(enemies[i].y + ' ' + player.y)
+                enemies[i].hasAttackedTimerJump = 0;
+                enemies[i].hasAttackedTimerStop = 0;
+                enemies[i].hasAttacked = true;
+                enemies[i].hitPoint -= 25;
+                lastEnemyHealth = enemies[i].hitPoint;
+                enemies[i].hitJumpR = true;
+                enemies[i].hitStop = true;
+                enemies[i].setAnimation(eAanimationHit);
+                enemies[i].setTimers = true;
+            } else if(playerStand.flip.x == 1 && (enemies[i].x >= player.x - 75 && enemies[i].x <= player.x 
+                && (Math.floor(enemies[i].y) >= player.y + 5 && Math.floor(enemies[i].y) <= player.y + 15))
+                && enemies[i].hasAttacked == false){
+                enemies[i].hasAttackedTimerJump = 0;
+                enemies[i].hasAttackedTimerStop = 0;
+                enemies[i].hasAttacked = true;
+                enemies[i].hitPoint -= 25;
+                lastEnemyHealth = enemies[i].hitPoint;
+                enemies[i].hitJumpL = true;
+                enemies[i].hitStop = true;
+                enemies[i].setAnimation(eAanimationHit);
+                enemies[i].setTimers = true;
+            }
         }
    }
 }
@@ -442,28 +538,89 @@ if(key.isDown('SPACE')) {
 //    log(player.speed.x)
 //};
     
-for(var i = 0; i < enemys.length; i++) {
-
-    var getRandomSpeed = Math.ceil(Math.random() * 2.5)
-    if(enemys[i].enemyMove == true){
-    enemys[i].x += getRandomSpeed;
-    } else {
-    enemys[i].x -= getRandomSpeed;
+for(var i = 0; i < enemies.length; i++) {
+    if(enemies[i].setTimers == true) {
+    enemies[i].hasAttackedTimerJump++;
+    enemies[i].hasAttackedTimerStop++;
     }
-    if(enemys[i].isStaticIntersect(player)) {
+    if(enemies[i].speedYfixer == true) {
+        enemies[i].y += 5;
+    }
+    if(enemies[i].hasAttackedTimerJump >= 30){
+        enemies[i].hitJumpR = false;
+        enemies[i].hasAttackedTimerJump = 0;
+    }
+    if(enemies[i].hasAttackedTimerStop >= 40){
+        enemies[i].setTimers = false;
+        enemies[i].hitStop = false;
+        enemies[i].setAnimation(eAnimationMove);
+        enemies[i].hasAttacked = false;
+        enemies[i].hasAttackedTimerStop = 0;
+    }
+    if(enemies[i].hitStop == false) {
+        if(enemies[i].hitJumpR == false && enemies[i].hitJumpl == false) {
+            var getRandomSpeed = Math.ceil(Math.random() * 2)
+                if(getRandomSpeed < 1) continue;
+                if(enemies[i].moveR == true){
+                    enemies[i].x += getRandomSpeed;
+                    enemies[i].setFlip(0, 0);
+                }else {
+                    enemies[i].x -= getRandomSpeed;
+                    enemies[i].setFlip(1, 0);
+                }
+            }
+        } else if (enemies[i].hitJumpR == true) {
+            enemies[i].x += 6;
+        } else if (enemies[i].hitJumpL == true) {
+            enemies[i].x -= 6;
+        }
+    if(enemies[i].isStaticIntersect(player) && player.hasAttacked != true) {
+        player.health -= 25;
+        player.hasAttacked = true;
+        setTimeout(function() {
+            player.hasAttacked = false;
+        }, 1000);
+    }
+    if(enemies[i].hitPoint <= 0) {
+        enemies.splice(i, 1);
+        
+    }
+    if(player.health <= 0) {
         document.location.reload();
-        log(1);
+    }
+}
+for(var j = 0; j < walls.length; j++) {
+    for(var i = 0; i < enemies.length; i++) {
+        if(enemies[i].isStaticIntersect(walls[j])) {
+            enemies[i].y = walls[j].y - enemies[i].h - 1;
+            enemies[i].speedYfixer = false;
+        } else {
+            enemies[i].speedYfixer = true;
+        }
     }
 }
     
 for(var j = 0; j < ground.length; j++) {
-    for(var i = 0; i < enemys.length; i++) {
-        if(ground[j].isStaticIntersect(enemys[i]) && enemys[i].y < ground[j].y && ground[j].file == "Textures/Walls/Wall 1 NE.png") {
-            enemys[i].enemyMove = false;
-            enemys[i].setFlip(1, 0);
-        } else if(ground[j].isStaticIntersect(enemys[i]) && enemys[i].y < ground[j].y && ground[j].file == "Textures/Walls/Wall 1 NW.png") {
-            enemys[i].enemyMove = true;
-            enemys[i].setFlip(0, 0);
+    for(var i = 0; i < enemies.length; i++) {
+        if(ground[j].isStaticIntersect(enemies[i]) && enemies[i].y < ground[j].y && ground[j].file == "Textures/Walls/Wall 1 NE.png") {
+//            var getRandomFlipPoint = Math.random() * 1.2;
+            var fix = i;
+//            setTimeout(function() {
+            enemies[fix].moveR = false;;
+//            }, 1000 * getRandomFlipPoint);
+//            setTimeout(function() {
+//            }, 1000 * getRandomFlipPoint);
+//            continue;
+            
+        } else if(ground[j].isStaticIntersect(enemies[i]) && enemies[i].y < ground[j].y && ground[j].file == "Textures/Walls/Wall 1 NW.png") {
+//            var getRandomFlipPoint = Math.random() * 1.2;
+            var fix = i;
+//            setTimeout(function() {
+                enemies[fix].moveR = true;
+//            }, 1000 * getRandomFlipPoint);
+//            setTimeout(function() {
+//            }, 1000 * getRandomFlipPoint);
+//            continue;
         }
     }
 }
@@ -503,9 +660,7 @@ OOP.drawArr(walls, function(el) {
 
 
 });
-OOP.drawArr(enemys);
-scoreText.x = player.x - 500;
-scoreText.y = player.y - 250;
+OOP.drawArr(enemies);
 playerStand.x = player.x;
 playerStand.y = player.y;
 playerMove.x = player.x;
@@ -531,10 +686,25 @@ if(player.speed.x) {
 }
 platformer.update();
 brush.drawTextS({
+    x : 35,
     y : 35,
-    text : 'SCORE: ' + score,
+    text : 'Score: ' + score,
     size : 30,
     color : 'white'
+});
+brush.drawTextS({
+    x : 200,
+    y : 60,
+    text : 'Enemy health: ' + lastEnemyHealth,
+    size : 30,
+    color : 'Red',
+});
+brush.drawTextS({
+    x : 200,
+    y : 35,
+    text : 'Your health: ' + player.health,
+    size : 30,
+    color : 'Green'
 });
 //console.log(key.getKeyList());
 

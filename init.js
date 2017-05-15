@@ -1,8 +1,8 @@
 var pjs = new PointJS('2D', 400, 400);
 pjs.system.initFullPage();
 var platformer = new PlatformerJS(pjs);
-//platformer.optMode = true;
-//platformer.useDeltaTime = true;
+platformer.optMode = true;
+platformer.useDeltaTime = true;
 
 var log = pjs.system.log;
 var game = pjs.game;
@@ -15,6 +15,10 @@ var math = pjs.math;
 var mouse = pjs.mouseControl.initMouseControl();
 
 var key = pjs.keyControl.initKeyControl();
+
+var joystick = new JoyStick(pjs, '', 160, 160, 0, 0, 0, 50);
+//joystick.show();
+joystick.hideBtn('btnDown');
 
 var tiles = pjs.tiles;
 pjs.system.setTitle('Spange BOBE');
